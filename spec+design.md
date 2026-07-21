@@ -31,6 +31,24 @@ flowchart LR
 - Local dev: vercel link and vercel env pull → .env.local with AWS_ROLE_ARN, AWS_REGION, PGHOST, PGPORT, PGUSER, PGDATABASE, VERCEL_OIDC_TOKEN, etc., as in the KB article.
 - If Express runs outside Vercel, OIDC/IAM wiring differs — you may use a standard Postgres password/URL for that host; document the split in your README.
 
+## Authentication
+
+The app (Vercel Function) uses Vercel OIDC Federation to fetch AWS temporary credetials from AWS STS. Then it uses AWS cred to locally sign (using @aws-sdk/rds-signer) a password-shaped short-lived RDS auth token. Vercel Function uses this signed token as password to authenticate/connect with Aurora PostgreSQL. Aurora verifies signature via IAM (checks rds-db:connect permission). Connection established.
+
+**Per-credential lifeline (e.g., roughly hourly, until temp creds expires)**
+Vercel Function -OIDC token-> AWS STS
+
+Vercel Function <-AWS temp credentials-- AWS STS
+
+**Per DB connection (auth token cacheable ~15 min, so reused across many queries on a pooled connection — not regenerated per query)**
+Vercel Function -RDS auth token-> Aurora PostgreSQL
+
+Vercel Function <-Connection established- Aurora PostgreSQL
+
+Vercel Function -query-> Aurora PostgreSQL
+
+Vercel Function <-data- Aurora PostgreSQL
+
 ## Data model
 
 RecipeGuru uses a PostgreSQL schema (database name can be **`recipeguru`** or your chosen name) with at least:
@@ -60,20 +78,18 @@ Implement in Express; paths below are illustrative — document the final routes
 ## Environment variables
 
 **`apps/api` (Express on Vercel path)**
-
-- Variables from the KB guide for Aurora + IAM
-- `CORS_ORIGIN`, `PORT` as needed (e.g. `4001` locally)
+Variables from the KB guide for Aurora + IAM;
+`CORS_ORIGIN`, `PORT` as needed (e.g. `4001` locally)
 
 **`apps/web` (Next.js)**
-
-- `NEXT_PUBLIC_API_URL` — public base URL of the Express API (e.g. `http://localhost:4001`)
+`NEXT_PUBLIC_API_URL`— public base URL of the Express API (e.g.`http://localhost:4001`)
 
 **Optional (observability)**
 
 - Sentry: DSN env vars per Sentry’s Next + Node SDK docs (server vs client keys).
 - PostHog: `NEXT_PUBLIC_POSTHOG_KEY` / host (web); use server-side key only if you capture events from Express.
 
-## Suggested repo layout
+## Application structure
 
 ```text
 recipeguru/
@@ -84,21 +100,6 @@ recipeguru/
   README.md
 ```
 
-## Supporting stack (recommended)
-
-| Concern                   | Suggestion                                                                                         |
-| ------------------------- | -------------------------------------------------------------------------------------------------- |
-| Request / env validation  | **Zod** — parse query/body and `process.env` in the API; share types with the web app where useful |
-| HTTP from Next to API     | **`fetch`** (native) — no extra client required for v1                                             |
-| Quality                   | **ESLint** + **Prettier** (or **Biome**); **TypeScript** `strict`                                  |
-| Tests (when you add them) | **Vitest** for units; contract or e2e against API + DB as needed                                   |
-| CI                        | **GitHub Actions** (or your host’s default) — `lint`, `typecheck`, `test`, migrate on deploy       |
-
-Nothing above is mandatory for a first vertical slice; add as soon as routes and env surface grow.
-|
-
-**Practical order:** Sentry + structured logging first (you will see failures immediately), then Vercel Analytics/Speed Insights if the app is on Vercel, then PostHog when you care about funnels and behavior beyond basics.
-
 ## Frontend (Next.js)
 
 - Recipe grid/list, search, recipe detail (ingredients + photos).
@@ -108,7 +109,6 @@ Nothing above is mandatory for a first vertical slice; add as soon as routes and
 
 - **Express on Vercel:** [Express on Vercel](https://vercel.com/docs/frameworks/backend/express) — default export `app`; `express.static` is not used for API-only apps.
 - **Next on Vercel:** standard Next deployment; set `NEXT_PUBLIC_API_URL` to the deployed API URL.
-- Alternative: host Express on Railway, Render, Fly, etc.; document how Aurora auth works (or doesn’t) on that host.
 
 ## License
 

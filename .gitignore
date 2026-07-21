@@ -6,3 +6,5 @@ node_modules/
 
 scratch.txt
 spec-draft.md
+.vercel
+.env*
