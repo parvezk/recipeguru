@@ -1,4 +1,5 @@
 import { config } from "dotenv";
+//The dotenv import ensures environment variables are loaded when running scripts locally - for auth token creation.
 config({ path: ".env.local" });
 
 import { awsCredentialsProvider } from "@vercel/functions/oidc";
@@ -44,6 +45,7 @@ const pool = new Pool({
   max: 20,
 });
 
+//attachDatabasePool utility optimizes connection management in serverless environments.
 attachDatabasePool(pool);
 
 // Single query transaction.
