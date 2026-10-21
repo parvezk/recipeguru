@@ -2,6 +2,7 @@ import http from "node:http";
 import { config } from "dotenv";
 config({ path: ".env.local", quiet: true });
 
+import type { FieldDef } from "pg";
 import { withConnection } from "./db";
 
 const PORT = Number(process.env.STUDIO_PORT || 4000);
@@ -591,7 +592,7 @@ const server = http.createServer(async (req, res) => {
         JSON.stringify({
           command: finalResult.command,
           rowCount: finalResult.rowCount,
-          fields: finalResult.fields?.map((f) => f.name) ?? [],
+          fields: finalResult.fields?.map((f: FieldDef) => f.name) ?? [],
           rows: finalResult.rows ?? [],
           durationMs,
         }),

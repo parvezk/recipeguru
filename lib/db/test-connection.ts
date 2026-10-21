@@ -12,12 +12,12 @@ async function testConnection() {
   console.log(`   Region: ${process.env.AWS_REGION}`);
 
   const signer = new Signer({
-    hostname: process.env.PGHOST,
+    hostname: process.env.PGHOST!,
     port: Number(process.env.PGPORT),
-    username: process.env.PGUSER,
-    region: process.env.AWS_REGION,
+    username: process.env.PGUSER!,
+    region: process.env.AWS_REGION!,
     credentials: awsCredentialsProvider({
-      roleArn: process.env.AWS_ROLE_ARN,
+      roleArn: process.env.AWS_ROLE_ARN!,
       clientConfig: { region: process.env.AWS_REGION },
     }),
   });
